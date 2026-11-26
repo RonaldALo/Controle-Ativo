@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Inventário de Ativos</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
 <style>
 :root{
   --bg:#f4f5fb;--card:#fff;--line:#e5e7f0;--txt:#111827;--mut:#6b7280;
@@ -118,10 +119,54 @@ main{max-width:680px;margin:-52px auto 0;padding:0 14px}
 .scan-tip{position:absolute;bottom:18px;left:0;right:0;text-align:center;color:#fff;font-size:14px;z-index:3;text-shadow:0 1px 4px #000}
 
 /* Toast */
-.toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top));transform:translate(-50%,-140%);background:#111827;color:#fff;padding:12px 18px;border-radius:14px;font-weight:600;font-size:14.5px;z-index:50;transition:transform .3s;max-width:92vw;box-shadow:var(--sh)}
+.toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top));transform:translate(-50%,-220%);background:#111827;color:#fff;padding:12px 18px;border-radius:14px;font-weight:600;font-size:14.5px;z-index:50;transition:transform .3s;max-width:92vw;box-shadow:var(--sh)}
 .toast.show{transform:translate(-50%,0)}
 .toast.ok{background:var(--ok)}.toast.err{background:var(--err)}.toast.warn{background:var(--warn)}
 
+/* ===== Modo relatório (computador) ===== */
+.head-btns{display:flex;gap:8px}
+body.modo-rel{padding-bottom:30px}
+body.modo-rel #coletor, body.modo-rel .bar{display:none}
+body:not(.modo-rel) #rel{display:none}
+body.modo-rel .top-row{max-width:1240px}
+#rel{max-width:1240px;margin:-52px auto 0;padding:0 16px}
+.login{max-width:360px;margin:8px auto 0;padding:30px 28px 24px;border-radius:20px;box-shadow:0 10px 40px rgba(17,24,39,.12)}
+.login .lk{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--pri),#7c3aed);display:grid;place-items:center;margin-bottom:18px;box-shadow:0 6px 16px rgba(79,70,229,.35)}
+.login .lk svg{width:22px;height:22px}
+.login h3{margin:0;font-size:19px}
+.login .hint{margin:4px 0 20px;color:var(--mut);font-size:14px;line-height:1.45}
+.login label{margin:0 0 6px}
+.pw{position:relative}
+.pw input{padding-right:48px}
+.pw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:9px;background:none;color:var(--mut);display:grid;place-items:center}
+.pw button:hover{background:var(--bg)}
+.pw svg{width:19px;height:19px}
+.login .btn{margin-top:16px;padding:13px;font-size:15px}
+.login .foot{margin-top:16px;text-align:center;font-size:12.5px;color:var(--mut)}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end}
+.fgrid label{margin-top:0}
+.quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.rstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+.rstats .stat.err b{color:var(--err)}
+.tabs-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.tabs{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:12px}
+.tabs button{padding:9px 14px;border-radius:9px;background:none;font-weight:600;font-size:14px;color:var(--mut)}
+.tabs button.on{background:#fff;color:var(--pri);box-shadow:var(--sh)}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tools input{width:240px;padding:10px 12px}
+.tools .btn{padding:11px 16px}
+.tblwrap{overflow:auto;max-height:62vh;border:1px solid var(--line);border-radius:12px}
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{position:sticky;top:0;background:#f8f9fd;text-align:left;padding:10px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--mut);border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl tr:hover td{background:#fafaff}
+.tbl tr.dup td{background:var(--warnSoft)}
+.tbl tr.click{cursor:pointer}
+.tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl .mono{font-family:ui-monospace,Menlo,monospace}
+.lote-sel{display:inline-flex;align-items:center;gap:6px;background:var(--priSoft);color:var(--pri);font-weight:600;font-size:13px;padding:6px 10px;border-radius:999px}
+.lote-sel button{background:none;color:var(--pri);font-size:14px;padding:0 2px}
+.btn.ghost{background:#fff;color:var(--pri);border:1.5px solid var(--line)}
 .hist{font-size:13.5px}
 .hist div{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
 .hist div:last-child{border:0}
@@ -137,11 +182,14 @@ main{max-width:680px;margin:-52px auto 0;padding:0 14px}
       <h1>📦 Inventário de Ativos</h1>
       <div class="sub" id="quem">Configure técnico e localidade</div>
     </div>
-    <button class="icon-btn" onclick="abrirConfig()" aria-label="Configurações">⚙️</button>
+    <div class="head-btns">
+      <button class="icon-btn" id="btnModo" onclick="trocarModo()" aria-label="Trocar modo" title="Relatórios / Coletor">📊</button>
+      <button class="icon-btn" id="btnCfg" onclick="abrirConfig()" aria-label="Configurações">⚙️</button>
+    </div>
   </div>
 </header>
 
-<main>
+<main id="coletor">
   <div class="stats">
     <div class="stat"><b id="sTotal">0</b><span>na lista</span></div>
     <div class="stat"><b id="sTipos">0</b><span>tipos</span></div>
@@ -162,6 +210,58 @@ main{max-width:680px;margin:-52px auto 0;padding:0 14px}
   </div>
   <div id="lista"></div>
 </main>
+
+<!-- ===== PAINEL DE RELATÓRIOS ===== -->
+<section id="rel">
+  <div class="card login" id="relLogin">
+    <div class="lk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+    <h3>Painel de relatórios</h3>
+    <p class="hint">Entre com a senha para ver e baixar os inventários.</p>
+    <label for="relSenha">Senha</label>
+    <div class="pw">
+      <input id="relSenha" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')entrarRel()">
+      <button type="button" onclick="verSenha()" aria-label="Mostrar senha" title="Mostrar senha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
+    <button class="btn full" id="btnEntrar" onclick="entrarRel()">Entrar</button>
+    <div class="foot">Acesso restrito à equipe de TI</div>
+  </div>
+
+  <div id="relApp" hidden>
+    <div class="card">
+      <div class="fgrid">
+        <div><label>De</label><input type="date" id="fDe"></div>
+        <div><label>Até</label><input type="date" id="fAte"></div>
+        <div><label>Localidade</label><select id="fLocal"></select></div>
+        <div><label>Tipo</label><select id="fTipo" onchange="renderRel()"></select></div>
+        <div><label>Técnico</label><select id="fTec" onchange="renderRel()"></select></div>
+        <div><button class="btn big full" id="btnBuscar" onclick="buscarRel()">🔎 Buscar</button></div>
+      </div>
+      <div class="quick">
+        <button class="chip" onclick="periodo(0)">Hoje</button>
+        <button class="chip" onclick="periodo(1)">Ontem</button>
+        <button class="chip" onclick="periodo(7)">Últimos 7 dias</button>
+        <button class="chip" onclick="periodo(30)">Últimos 30 dias</button>
+        <button class="chip" onclick="periodo('mes')">Este mês</button>
+        <button class="chip" onclick="periodo('tudo')">Tudo</button>
+        <button class="chip" onclick="sairRel()" style="margin-left:auto">Sair 🔒</button>
+      </div>
+    </div>
+
+    <div class="rstats" id="relStats"></div>
+
+    <div class="card">
+      <div class="tabs-row">
+        <div class="tabs" id="relTabs"></div>
+        <div class="tools">
+          <span id="loteSel"></span>
+          <input id="relBusca" placeholder="Buscar serial, modelo, patrimônio…" oninput="renderRel()">
+          <button class="btn ok" onclick="baixarExcel()">⬇ Excel</button>
+        </div>
+      </div>
+      <div class="tblwrap" id="relTabela"></div>
+    </div>
+  </div>
+</section>
 
 <nav class="bar">
   <div class="bar-in">
@@ -197,9 +297,13 @@ main{max-width:680px;margin:-52px auto 0;padding:0 14px}
     <label>Patrimônio</label>
     <div class="with-btn"><input id="patrimonio" autocomplete="off" inputmode="text"><button onclick="lerCampo('patrimonio')" aria-label="Ler patrimônio">📷</button></div>
 
-    <div class="row">
-      <div><label>Marca</label><input id="marca" list="lMarcas" autocomplete="off"></div>
-      <div><label>Modelo</label><input id="modelo" list="lModelos" autocomplete="off"></div>
+    <label>Modelo</label>
+    <select id="catModelo" onchange="escolherModelo()"></select>
+    <div id="boxOutro" style="display:none">
+      <div class="row">
+        <div><label>Marca</label><input id="marca" list="lMarcas" autocomplete="off"></div>
+        <div><label>Modelo</label><input id="modelo" list="lModelos" autocomplete="off"></div>
+      </div>
     </div>
     <datalist id="lMarcas"></datalist><datalist id="lModelos"></datalist>
 
@@ -264,8 +368,21 @@ main{max-width:680px;margin:-52px auto 0;padding:0 14px}
 /* ========= CONFIGURAÇÃO =========
    API_PADRAO: URL do Apps Script (termina em /exec).
    LOCALIDADES: cada uma vira uma aba na planilha. Para incluir uma cidade, é só adicionar aqui. */
-const API_PADRAO = 'https://script.google.com/macros/s/AKfycbw89NpjTddE8H-cd27jX1yQL9O2KvLn2eGeIt2XrBHnZZPBMGMePnXgHyXW5Sv1HT2p/exec';
-const LOCALIDADES = ['GVO', 'Uberlândia', 'Juiz de Fora', 'Montes Claros'];
+const API_PADRAO = 'https://script.google.com/macros/s/AKfycbxto7lwSg8FS-ibP8VW0yNX2DnZex1CiwKFhZFd4RHlVeQrZCNS1jGaM0l9NvdmBATL/exec';
+const LOCALIDADES = ['GVO','Juiz de Fora', 'Araraquara ',"São Paulo","Chile"];
+
+/* CATÁLOGO DE MODELOS por tipo — sempre "Marca Modelo" (a 1ª palavra vira a marca).
+   O técnico escolhe na lista; "Outro" abre campos para digitar. */
+const CATALOGO = {
+  Desktop:    ['Dell OptiPlex 3080', 'Dell OptiPlex 7090', 'Lenovo ThinkCentre M70q', 'HP ProDesk 400'],
+  Notebook:   ['Dell Latitude 5420', 'Lenovo ThinkPad E14', 'HP ProBook 440'],
+  Monitor:    ['Dell P2422H', 'LG 24MK430H', 'AOC 24B1H'],
+  Celular:    ['Samsung Galaxy A54', 'Motorola Moto G84', 'Apple iPhone 13'],
+  Teclado:    ['Logitech K120', 'Dell KB216', 'Multilaser TC193'],
+  Mouse:      ['Logitech M90', 'Dell MS116', 'Multilaser MO255'],
+  Impressora: ['HP LaserJet M404', 'Epson L3250', 'Brother DCP-L2540'],
+  Outro:      []
+};
 
 const TIPOS = [
   ['Desktop','🖥️'],['Notebook','💻'],['Monitor','📺'],['Celular','📱'],
@@ -363,8 +480,31 @@ function render(){
 
 /* ========= FORMULÁRIO ========= */
 function renderTipos(){
-  $('types').innerHTML = TIPOS.map(([t,i]) => `<button class="type ${t===tipoSel?'on':''}" onclick="tipoSel='${t}';renderTipos()"><i>${i}</i>${t}</button>`).join('');
+  $('types').innerHTML = TIPOS.map(([t,i]) => `<button class="type ${t===tipoSel?'on':''}" onclick="selecionarTipo('${t}')"><i>${i}</i>${t}</button>`).join('');
   $('estados').innerHTML = ESTADOS.map(e => `<button class="${e===estadoSel?'on':''}" onclick="estadoSel='${e}';renderTipos()">${e}</button>`).join('');
+  renderModelos();
+}
+function selecionarTipo(t){
+  if (t !== tipoSel) { $('marca').value = ''; $('modelo').value = ''; }
+  tipoSel = t; renderTipos();
+}
+function renderModelos(){
+  const lista = CATALOGO[tipoSel] || [];
+  const atual = [$('marca').value, $('modelo').value].filter(Boolean).join(' ');
+  $('catModelo').innerHTML = '<option value="">Selecione o modelo…</option>' +
+    lista.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('') +
+    '<option value="__outro">Outro (digitar)</option>';
+  if (lista.includes(atual)) { $('catModelo').value = atual; $('boxOutro').style.display = 'none'; }
+  else if (atual || !lista.length) { $('catModelo').value = '__outro'; $('boxOutro').style.display = ''; }
+  else { $('catModelo').value = ''; $('boxOutro').style.display = 'none'; }
+}
+function escolherModelo(){
+  const v = $('catModelo').value;
+  if (v === '__outro') { $('marca').value = ''; $('modelo').value = ''; $('boxOutro').style.display = ''; $('marca').focus(); return; }
+  $('boxOutro').style.display = 'none';
+  const [marca, ...resto] = v.split(' ');
+  $('marca').value = v ? marca : '';
+  $('modelo').value = v ? resto.join(' ') : '';
 }
 function atualizarSugestoes(){
   const marcas = [...new Set([...itens.map(i=>i.marca).filter(Boolean), ...MARCAS])];
@@ -533,8 +673,180 @@ function exportarCSV(){
 }
 
 $('busca').addEventListener('input', render);
+/* ========= PAINEL DE RELATÓRIOS ========= */
+let relItens = [], relAba = 'itens', relLote = null, relBuscou = false;
+const hojeISO = (off=0) => { const d = new Date(); d.setDate(d.getDate()-off); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const isoBR = s => s ? s.split('-').reverse().join('/') : '';
+
+function setModo(m){
+  document.body.classList.toggle('modo-rel', m==='rel');
+  $('btnModo').textContent = m==='rel' ? '📷' : '📊';
+  $('btnModo').title = m==='rel' ? 'Ir para o coletor' : 'Ir para relatórios';
+  $('btnCfg').style.display = m==='rel' ? 'none' : '';
+  try{ sessionStorage.setItem('inv_modo', m); }catch(e){}
+  if (m==='rel') {
+    $('quem').textContent = 'Painel de relatórios';
+    const senha = sessionStorage.getItem('inv_senha');
+    if (senha && !relBuscou) buscarRel(true);
+  } else render();
+}
+function trocarModo(){ setModo(document.body.classList.contains('modo-rel') ? 'col' : 'rel'); }
+
+function entrarRel(){
+  const s = $('relSenha').value;
+  if (!s) { toast('Digite a senha','warn'); return; }
+  try{ sessionStorage.setItem('inv_senha', s); }catch(e){}
+  buscarRel(true);
+}
+function verSenha(){ const i = $('relSenha'); i.type = i.type==='password' ? 'text' : 'password'; i.focus(); }
+function sairRel(){
+  try{ sessionStorage.removeItem('inv_senha'); }catch(e){}
+  relItens = []; relBuscou = false; $('relSenha').value = '';
+  $('relApp').hidden = true; $('relLogin').hidden = false;
+}
+function mostrarRelApp(){ $('relLogin').hidden = true; $('relApp').hidden = false; }
+function prepararFiltros(){
+  if (!$('fLocal').options.length) {
+    $('fLocal').innerHTML = '<option value="">Todas</option>' + LOCALIDADES.map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join('');
+    $('fTipo').innerHTML = '<option value="">Todos</option>' + TIPOS.map(t=>`<option value="${t[0]}">${t[1]} ${t[0]}</option>`).join('');
+    $('fTec').innerHTML = '<option value="">Todos</option>';
+    $('fDe').value = hojeISO(); $('fAte').value = hojeISO();
+  }
+}
+function periodo(p){
+  if (p==='tudo') { $('fDe').value=''; $('fAte').value=''; }
+  else if (p==='mes') { const d=new Date(); $('fDe').value = hojeISO(d.getDate()-1); $('fAte').value = hojeISO(); }
+  else if (p===1) { $('fDe').value = hojeISO(1); $('fAte').value = hojeISO(1); }
+  else { $('fDe').value = hojeISO(p ? p-1 : 0); $('fAte').value = hojeISO(); }
+  buscarRel();
+}
+
+async function buscarRel(login){
+  const senha = sessionStorage.getItem('inv_senha');
+  if (!senha) return;
+  prepararFiltros();
+  const btn = $('btnBuscar'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+  const btnE = $('btnEntrar'); btnE.disabled = true; btnE.innerHTML = '<span class="spin"></span> Verificando…';
+  try{
+    const r = await fetch(API_PADRAO, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ acao:'relatorio', senha, de:$('fDe').value, ate:$('fAte').value, localidade:$('fLocal').value }) });
+    const j = await r.json();
+    if (!j.ok) {
+      if (j.erro==='senha') { sairRel(); toast('Senha incorreta','err'); return; }
+      if (j.erro==='Lote vazio') { sairRel(); toast('Apps Script desatualizado: publique a nova versão do Code.gs','err'); return; }
+      throw new Error(j.erro);
+    }
+    mostrarRelApp();
+    relItens = j.itens; relLote = null; relBuscou = true;
+    const tecAtual = $('fTec').value;
+    const tecs = [...new Set(relItens.map(i=>i.tecnico).filter(Boolean))].sort();
+    $('fTec').innerHTML = '<option value="">Todos</option>' + tecs.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+    if (tecs.includes(tecAtual)) $('fTec').value = tecAtual;
+    renderRel();
+  }catch(e){
+    if (login) sairRel();
+    toast('Não foi possível carregar o relatório','err');
+  }finally{
+    btn.disabled = false; btn.innerHTML = '🔎 Buscar';
+    btnE.disabled = false; btnE.innerHTML = 'Entrar';
+  }
+}
+
+function relFiltrados(){
+  const tipo = $('fTipo').value, tec = $('fTec').value, q = $('relBusca').value.trim().toLowerCase();
+  return relItens.filter(i =>
+    (!tipo || i.tipo===tipo) && (!tec || i.tecnico===tec) && (!relLote || i.lote===relLote) &&
+    (!q || [i.serial,i.patrimonio,i.marca,i.modelo,i.obs,i.lote,i.localidade].join(' ').toLowerCase().includes(q)));
+}
+function agruparLotes(lista){
+  const m = {};
+  lista.forEach(i => {
+    const l = m[i.lote] || (m[i.lote] = { lote:i.lote, recebido:i.recebido, localidade:i.localidade, tecnico:i.tecnico, qtd:0, tipos:{} });
+    l.qtd++; l.tipos[i.tipo] = (l.tipos[i.tipo]||0)+1;
+  });
+  return Object.values(m);
+}
+function matrizTipos(lista){
+  const locs = [...new Set(lista.map(i=>i.localidade))].sort();
+  const tipos = TIPOS.map(t=>t[0]).filter(t => lista.some(i=>i.tipo===t));
+  const c = {}; lista.forEach(i => { const k=i.localidade+'|'+i.tipo; c[k]=(c[k]||0)+1; });
+  return { locs, tipos, c };
+}
+
+function renderRel(){
+  const lista = relFiltrados();
+  const dupC = {}; lista.forEach(i => { const k=(i.serial||'').toUpperCase(); if(k) dupC[k]=(dupC[k]||0)+1; });
+  const isDup = i => dupC[(i.serial||'').toUpperCase()] > 1;
+  const lotes = agruparLotes(lista);
+  const defeito = lista.filter(i=>i.estado==='Defeito'||i.estado==='Descarte').length;
+  const periodoTxt = $('fDe').value||$('fAte').value ? `${isoBR($('fDe').value)||'início'} a ${isoBR($('fAte').value)||'hoje'}` : 'todo o período';
+
+  $('relStats').innerHTML = `
+    <div class="stat"><b>${lista.length}</b><span>itens · ${esc(periodoTxt)}</span></div>
+    <div class="stat"><b>${lotes.length}</b><span>lotes enviados</span></div>
+    <div class="stat"><b>${new Set(lista.map(i=>i.localidade)).size}</b><span>localidades</span></div>
+    <div class="stat"><b>${new Set(lista.map(i=>i.tecnico)).size}</b><span>técnicos</span></div>
+    <div class="stat err"><b>${defeito}</b><span>defeito / descarte</span></div>
+    <div class="stat warn"><b>${lista.filter(isDup).length}</b><span>seriais duplicados</span></div>`;
+
+  const abas = [['itens',`Itens (${lista.length})`],['lotes',`Lotes (${lotes.length})`],['tipos','Por tipo']];
+  $('relTabs').innerHTML = abas.map(([k,t]) => `<button class="${k===relAba?'on':''}" onclick="relAba='${k}';renderRel()">${t}</button>`).join('');
+  $('loteSel').innerHTML = relLote ? `<span class="lote-sel">Lote ${esc(relLote)} <button onclick="relLote=null;renderRel()">✕</button></span>` : '';
+
+  let html = '';
+  if (!relItens.length) html = '<div class="empty"><div class="big">📭</div>Nenhum inventário nesse período.</div>';
+  else if (relAba==='itens') {
+    html = `<table class="tbl"><thead><tr><th>Recebido</th><th>Localidade</th><th>Técnico</th><th>Tipo</th><th>Marca / Modelo</th><th>Serial</th><th>Patrimônio</th><th>Estado</th><th>Lote</th><th>Obs.</th></tr></thead><tbody>` +
+      lista.map(i => `<tr class="${isDup(i)?'dup':''}"><td>${esc(i.recebido)}</td><td>${esc(i.localidade)}</td><td>${esc(i.tecnico)}</td><td>${icone(i.tipo)} ${esc(i.tipo)}</td><td>${esc([i.marca,i.modelo].filter(Boolean).join(' '))}</td><td class="mono">${esc(i.serial)}${isDup(i)?' ⚠':''}</td><td class="mono">${esc(i.patrimonio)}</td><td>${esc(i.estado)}</td><td class="mono">${esc(i.lote)}</td><td>${esc(i.obs)}</td></tr>`).join('') +
+      '</tbody></table>';
+  } else if (relAba==='lotes') {
+    html = `<table class="tbl"><thead><tr><th>Recebido</th><th>Lote</th><th>Localidade</th><th>Técnico</th><th>Composição</th><th class="num">Itens</th></tr></thead><tbody>` +
+      lotes.map(l => `<tr class="click" onclick="relLote='${esc(l.lote)}';relAba='itens';renderRel()"><td>${esc(l.recebido)}</td><td class="mono">${esc(l.lote)}</td><td>${esc(l.localidade)}</td><td>${esc(l.tecnico)}</td><td>${Object.entries(l.tipos).map(([t,n])=>`${icone(t)} ${n}`).join(' &nbsp; ')}</td><td class="num"><b>${l.qtd}</b></td></tr>`).join('') +
+      '</tbody></table>';
+  } else {
+    const { locs, tipos, c } = matrizTipos(lista);
+    html = `<table class="tbl"><thead><tr><th>Localidade</th>${tipos.map(t=>`<th class="num">${icone(t)} ${t}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>` +
+      locs.map(l => `<tr><td><b>${esc(l)}</b></td>${tipos.map(t=>`<td class="num">${c[l+'|'+t]||'–'}</td>`).join('')}<td class="num"><b>${tipos.reduce((s,t)=>s+(c[l+'|'+t]||0),0)}</b></td></tr>`).join('') +
+      `<tr><td><b>Total</b></td>${tipos.map(t=>`<td class="num"><b>${lista.filter(i=>i.tipo===t).length}</b></td>`).join('')}<td class="num"><b>${lista.length}</b></td></tr></tbody></table>`;
+  }
+  $('relTabela').innerHTML = html;
+}
+
+function baixarExcel(){
+  if (typeof XLSX === 'undefined') { toast('Gerador de Excel não carregou. Verifique a internet.','err'); return; }
+  const lista = relFiltrados();
+  if (!lista.length) { toast('Nada para exportar','warn'); return; }
+  const wb = XLSX.utils.book_new();
+  const ajustar = (ws, larg) => { ws['!cols'] = larg.map(w=>({wch:w})); return ws; };
+
+  const itensWs = XLSX.utils.json_to_sheet(lista.map(i => ({
+    'Recebido em': i.recebido, 'Localidade': i.localidade, 'Técnico': i.tecnico, 'Tipo': i.tipo,
+    'Marca': i.marca, 'Modelo': i.modelo, 'Serial': i.serial, 'Patrimônio': i.patrimonio,
+    'Estado': i.estado, 'Observação': i.obs, 'Lido em': i.lidoEm, 'Lote': i.lote })));
+  XLSX.utils.book_append_sheet(wb, ajustar(itensWs,[17,16,18,12,12,20,20,14,11,28,19,16]), 'Itens');
+
+  const { locs, tipos, c } = matrizTipos(lista);
+  const resumo = locs.map(l => { const r = { 'Localidade': l }; tipos.forEach(t => r[t] = c[l+'|'+t]||0); r['Total'] = tipos.reduce((s,t)=>s+(c[l+'|'+t]||0),0); return r; });
+  const tot = { 'Localidade': 'TOTAL' }; tipos.forEach(t => tot[t] = lista.filter(i=>i.tipo===t).length); tot['Total'] = lista.length; resumo.push(tot);
+  XLSX.utils.book_append_sheet(wb, ajustar(XLSX.utils.json_to_sheet(resumo),[18,...tipos.map(()=>12),10]), 'Resumo');
+
+  const lotesWs = XLSX.utils.json_to_sheet(agruparLotes(lista).map(l => ({
+    'Recebido em': l.recebido, 'Lote': l.lote, 'Localidade': l.localidade, 'Técnico': l.tecnico, 'Itens': l.qtd })));
+  XLSX.utils.book_append_sheet(wb, ajustar(lotesWs,[17,18,16,18,8]), 'Lotes');
+
+  const de = $('fDe').value, ate = $('fAte').value;
+  const nome = 'inventario_' + ($('fLocal').value ? $('fLocal').value.replace(/\s+/g,'_')+'_' : '') +
+    (de||ate ? (de===ate ? de : `${de||'inicio'}_a_${ate||'hoje'}`) : 'completo') + '.xlsx';
+  XLSX.writeFile(wb, nome);
+}
+
+/* ========= INÍCIO ========= */
 render();
-if (!cfg.tecnico) abrirConfig();
+let modoInicial = 'col';
+try{ modoInicial = sessionStorage.getItem('inv_modo') || (matchMedia('(pointer:fine)').matches && innerWidth >= 900 ? 'rel' : 'col'); }catch(e){}
+if (qs.get('modo') === 'rel' || qs.get('modo') === 'col') modoInicial = qs.get('modo');
+setModo(modoInicial);
+if (modoInicial === 'col' && !cfg.tecnico) abrirConfig();
 </script>
 </body>
 </html>
