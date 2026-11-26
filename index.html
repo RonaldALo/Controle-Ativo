@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Inventário de Ativos</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#f4f5fb;--card:#fff;--line:#e5e7f0;--txt:#111827;--mut:#6b7280;
+  --pri:#4f46e5;--pri2:#6366f1;--priSoft:#eef2ff;--ok:#16a34a;--okSoft:#dcfce7;
+  --warn:#d97706;--warnSoft:#fef3c7;--err:#dc2626;--errSoft:#fee2e2;
+  --r:16px;--sh:0 1px 2px rgba(17,24,39,.04),0 4px 16px rgba(17,24,39,.06);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+button{font:inherit;cursor:pointer;border:0}
+input,select,textarea{font:inherit;font-size:16px;width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--txt);outline:none;transition:border .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--pri)}
+label{display:block;font-size:12.5px;font-weight:600;color:var(--mut);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.03em}
+
+/* Header */
+.top{background:linear-gradient(135deg,var(--pri),#7c3aed);color:#fff;padding:calc(18px + env(safe-area-inset-top)) 18px 70px;border-radius:0 0 28px 28px}
+.top-row{display:flex;justify-content:space-between;align-items:center;max-width:680px;margin:auto}
+.top h1{margin:0;font-size:20px;font-weight:700}
+.top .sub{opacity:.85;font-size:13.5px;margin-top:3px}
+.icon-btn{background:rgba(255,255,255,.18);color:#fff;width:42px;height:42px;border-radius:12px;font-size:19px;display:grid;place-items:center}
+main{max-width:680px;margin:-52px auto 0;padding:0 14px}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.stat{background:var(--card);border-radius:var(--r);padding:14px 12px;box-shadow:var(--sh)}
+.stat b{display:block;font-size:24px}
+.stat span{font-size:12px;color:var(--mut)}
+.stat.warn b{color:var(--warn)}
+
+/* Toolbar */
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:14px}
+.search{position:relative}
+.search input{padding-left:40px}
+.search::before{content:"🔍";position:absolute;left:13px;top:12px;font-size:16px;opacity:.6}
+.filters{display:flex;gap:6px;overflow-x:auto;padding:12px 0 2px;scrollbar-width:none}
+.filters::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:8px 13px;border-radius:999px;background:var(--bg);border:1.5px solid var(--line);font-size:14px;font-weight:500;color:var(--txt);white-space:nowrap}
+.chip.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.chip small{opacity:.7;margin-left:4px}
+
+/* Lista */
+.list-head{display:flex;justify-content:space-between;align-items:center;margin:18px 4px 10px}
+.list-head h2{font-size:15px;margin:0}
+.link{background:none;color:var(--pri);font-weight:600;font-size:14px;padding:4px}
+.item{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:13px 14px;margin-bottom:10px;display:flex;gap:12px;align-items:center;animation:in .25s ease}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.ico{width:46px;height:46px;border-radius:12px;background:var(--priSoft);display:grid;place-items:center;font-size:22px;flex:none}
+.info{flex:1;min-width:0}
+.info b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.info .meta{font-size:13px;color:var(--mut);margin-top:3px;font-family:ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tags{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--bg);color:var(--mut)}
+.tag.dup{background:var(--warnSoft);color:var(--warn)}
+.tag.def{background:var(--errSoft);color:var(--err)}
+.tag.ok{background:var(--okSoft);color:var(--ok)}
+.acts{display:flex;flex-direction:column;gap:6px}
+.acts button{width:38px;height:38px;border-radius:10px;background:var(--bg);font-size:16px}
+.empty{text-align:center;padding:44px 20px;color:var(--mut)}
+.empty .big{font-size:54px;margin-bottom:8px}
+
+/* Barra inferior */
+.bar{position:fixed;left:0;right:0;bottom:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-top:1px solid var(--line);z-index:5}
+.bar-in{max-width:680px;margin:auto;display:grid;grid-template-columns:1fr 1.6fr 1fr;gap:10px}
+.btn{padding:15px 10px;border-radius:14px;font-weight:700;font-size:15px;color:#fff;background:var(--pri);display:flex;align-items:center;justify-content:center;gap:6px}
+.btn.sec{background:var(--bg);color:var(--txt);border:1.5px solid var(--line)}
+.btn.ok{background:var(--ok)}
+.btn.big{font-size:16px;box-shadow:0 6px 18px rgba(79,70,229,.35)}
+.btn:disabled{opacity:.5}
+.btn.full{width:100%}
+
+/* Sheets (modais) */
+.ov{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.ov.show{display:flex;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.sheet{background:var(--card);width:100%;max-width:680px;border-radius:24px 24px 0 0;padding:10px 18px calc(18px + env(safe-area-inset-bottom));max-height:94vh;overflow:auto;animation:up .25s ease}
+@keyframes up{from{transform:translateY(40px)}}
+.grab{width:42px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 10px}
+.sheet h3{margin:4px 0 2px;font-size:19px}
+.sheet .hint{color:var(--mut);font-size:13.5px;margin:0}
+.row{display:flex;gap:10px}.row>*{flex:1;min-width:0}
+.with-btn{display:flex;gap:8px}
+.with-btn button{flex:none;width:50px;border-radius:12px;background:var(--priSoft);font-size:20px}
+.types{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.type{padding:10px 4px;border-radius:12px;border:1.5px solid var(--line);background:#fff;font-size:12px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--txt)}
+.type i{font-style:normal;font-size:22px}
+.type.on{border-color:var(--pri);background:var(--priSoft);color:var(--pri)}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.seg button{padding:11px 4px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-size:13px;font-weight:600;color:var(--txt)}
+.seg button.on{border-color:var(--pri);background:var(--pri);color:#fff}
+.actions{display:grid;gap:10px;margin-top:20px}
+.actions .row .btn{flex:1}
+
+/* Scanner */
+.scan-ov{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:30}
+.scan-ov.show{display:flex}
+.scan-top{display:flex;justify-content:space-between;align-items:center;padding:calc(14px + env(safe-area-inset-top)) 16px 12px;color:#fff}
+.scan-top b{font-size:16px}
+.cam{flex:1;position:relative;overflow:hidden;display:flex;align-items:center}
+#reader{width:100%}
+#reader video{border-radius:0}
+.scan-frame{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);width:78%;max-width:360px;height:150px;border-radius:18px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);pointer-events:none;z-index:2}
+.scan-frame::before,.scan-frame::after{content:"";position:absolute;left:10px;right:10px;height:2px;background:#ef4444;top:50%;box-shadow:0 0 12px #ef4444;animation:laser 1.6s ease-in-out infinite}
+.scan-frame::after{display:none}
+@keyframes laser{0%,100%{transform:translateY(-55px)}50%{transform:translateY(55px)}}
+.scan-corners{position:absolute;inset:0;border:3px solid #fff;border-radius:18px;opacity:.9}
+.scan-bottom{padding:16px 16px calc(20px + env(safe-area-inset-bottom));display:flex;gap:10px;color:#fff}
+.scan-bottom .btn{flex:1}
+.scan-tip{position:absolute;bottom:18px;left:0;right:0;text-align:center;color:#fff;font-size:14px;z-index:3;text-shadow:0 1px 4px #000}
+
+/* Toast */
+.toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top));transform:translate(-50%,-140%);background:#111827;color:#fff;padding:12px 18px;border-radius:14px;font-weight:600;font-size:14.5px;z-index:50;transition:transform .3s;max-width:92vw;box-shadow:var(--sh)}
+.toast.show{transform:translate(-50%,0)}
+.toast.ok{background:var(--ok)}.toast.err{background:var(--err)}.toast.warn{background:var(--warn)}
+
+.hist{font-size:13.5px}
+.hist div{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
+.hist div:last-child{border:0}
+.spin{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-row">
+    <div>
+      <h1>📦 Inventário de Ativos</h1>
+      <div class="sub" id="quem">Configure técnico e localidade</div>
+    </div>
+    <button class="icon-btn" onclick="abrirConfig()" aria-label="Configurações">⚙️</button>
+  </div>
+</header>
+
+<main>
+  <div class="stats">
+    <div class="stat"><b id="sTotal">0</b><span>na lista</span></div>
+    <div class="stat"><b id="sTipos">0</b><span>tipos</span></div>
+    <div class="stat warn"><b id="sDup">0</b><span>duplicados</span></div>
+  </div>
+
+  <div class="card">
+    <div class="search"><input id="busca" placeholder="Buscar serial, modelo, patrimônio…" autocomplete="off"></div>
+    <div class="filters" id="filtros"></div>
+  </div>
+
+  <div class="list-head">
+    <h2 id="tituloLista">Itens lidos</h2>
+    <div>
+      <button class="link" onclick="exportarCSV()">⬇ CSV</button>
+      <button class="link" onclick="abrirHist()">🕘 Envios</button>
+    </div>
+  </div>
+  <div id="lista"></div>
+</main>
+
+<nav class="bar">
+  <div class="bar-in">
+    <button class="btn sec" onclick="abrirForm()">✍️ Manual</button>
+    <button class="btn big" onclick="abrirScanner()">📷 Escanear</button>
+    <button class="btn ok" id="btnEnviar" onclick="confirmarEnvio()">⬆ Enviar</button>
+  </div>
+</nav>
+
+<!-- Scanner -->
+<div class="scan-ov" id="ovScan">
+  <div class="scan-top"><b id="scanTitulo">Aponte para o código de barras</b><button class="icon-btn" onclick="fecharScanner()">✕</button></div>
+  <div class="cam"><div id="reader"></div><div class="scan-tip">Mantenha o código dentro da moldura</div></div>
+  <div class="scan-bottom">
+    <button class="btn sec" id="btnTorch" style="display:none" onclick="alternarLanterna()">🔦 Lanterna</button>
+    <button class="btn sec" onclick="fecharScanner();abrirForm()">⌨️ Digitar</button>
+  </div>
+</div>
+
+<!-- Formulário do ativo -->
+<div class="ov" id="ovForm" onclick="if(event.target===this)fecharForm()">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3 id="fTitulo">Novo ativo</h3>
+    <p class="hint" id="fHint">Confira os dados e salve.</p>
+
+    <label>Tipo</label>
+    <div class="types" id="types"></div>
+
+    <label>Número de série</label>
+    <div class="with-btn"><input id="serial" autocomplete="off" autocapitalize="characters"><button onclick="lerCampo('serial')" aria-label="Ler serial">📷</button></div>
+
+    <label>Patrimônio</label>
+    <div class="with-btn"><input id="patrimonio" autocomplete="off" inputmode="text"><button onclick="lerCampo('patrimonio')" aria-label="Ler patrimônio">📷</button></div>
+
+    <div class="row">
+      <div><label>Marca</label><input id="marca" list="lMarcas" autocomplete="off"></div>
+      <div><label>Modelo</label><input id="modelo" list="lModelos" autocomplete="off"></div>
+    </div>
+    <datalist id="lMarcas"></datalist><datalist id="lModelos"></datalist>
+
+    <label>Estado</label>
+    <div class="seg" id="estados"></div>
+
+    <label>Observação</label>
+    <textarea id="obs" rows="2" placeholder="Opcional: setor, usuário, avaria…"></textarea>
+
+    <div class="actions">
+      <button class="btn big full" onclick="salvar(true)">✔ Salvar e ler próximo</button>
+      <div class="row">
+        <button class="btn sec" onclick="fecharForm()">Cancelar</button>
+        <button class="btn sec" onclick="salvar(false)">Só salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Configurações -->
+<div class="ov" id="ovConfig">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>Configuração</h3>
+    <p class="hint">Preencha uma vez. Fica salvo neste celular.</p>
+    <label>Nome do técnico</label><input id="cTecnico" placeholder="Ex: João Silva">
+    <label>Localidade</label><select id="cLocalidade"></select>
+    <div class="actions">
+      <button class="btn sec full" onclick="testarConexao()">🔌 Testar conexão</button>
+      <button class="btn big full" onclick="salvarConfig()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmar envio -->
+<div class="ov" id="ovEnvio" onclick="if(event.target===this)fechar('ovEnvio')">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>Enviar para a planilha</h3>
+    <p class="hint" id="envioResumo"></p>
+    <div id="envioTipos" class="hist" style="margin-top:10px"></div>
+    <div class="actions">
+      <button class="btn ok big full" id="btnConfirmar" onclick="enviar()">⬆ Confirmar envio</button>
+      <button class="btn sec full" onclick="fechar('ovEnvio')">Voltar e revisar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Histórico -->
+<div class="ov" id="ovHist" onclick="if(event.target===this)fechar('ovHist')">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>Envios deste celular</h3>
+    <div class="hist" id="histLista"></div>
+    <div class="actions"><button class="btn sec full" onclick="fechar('ovHist')">Fechar</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ========= CONFIGURAÇÃO =========
+   API_PADRAO: URL do Apps Script (termina em /exec).
+   LOCALIDADES: cada uma vira uma aba na planilha. Para incluir uma cidade, é só adicionar aqui. */
+const API_PADRAO = 'https://script.google.com/macros/s/AKfycbw89NpjTddE8H-cd27jX1yQL9O2KvLn2eGeIt2XrBHnZZPBMGMePnXgHyXW5Sv1HT2p/exec';
+const LOCALIDADES = ['GVO', 'Uberlândia', 'Juiz de Fora', 'Montes Claros'];
+
+const TIPOS = [
+  ['Desktop','🖥️'],['Notebook','💻'],['Monitor','📺'],['Celular','📱'],
+  ['Teclado','⌨️'],['Mouse','🖱️'],['Impressora','🖨️'],['Outro','📦']
+];
+const ESTADOS = ['Em uso','Estoque','Defeito','Descarte'];
+const CAMPOS = ['serial','patrimonio','marca','modelo','obs'];
+const MARCAS = ['Dell','Lenovo','HP','Positivo','Samsung','Apple','Motorola','Logitech','Multilaser','LG','AOC','Epson'];
+
+const $ = id => document.getElementById(id);
+const LS = {
+  get:(k,d)=>{try{const v=localStorage.getItem('inv_'+k);return v===null?d:JSON.parse(v)}catch(e){return d}},
+  set:(k,v)=>{try{localStorage.setItem('inv_'+k,JSON.stringify(v))}catch(e){}}
+};
+
+let itens = LS.get('itens', []);
+let cfg = LS.get('cfg', {tecnico:'',localidade:'',api:''});
+let hist = LS.get('hist', []);
+let filtro = 'Todos', editId = null, tipoSel = LS.get('ultimoTipo','Desktop'), estadoSel = 'Em uso';
+let scanner = null, campoAlvo = null, lanterna = false, lendo = false;
+
+// URL fixa no código; localidade pode vir no link (?local=GVO)
+const qs = new URLSearchParams(location.search);
+cfg.api = API_PADRAO;
+if (LOCALIDADES.includes(qs.get('local'))) cfg.localidade = qs.get('local');
+if (!LOCALIDADES.includes(cfg.localidade)) cfg.localidade = '';
+LS.set('cfg', cfg);
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const icone = t => (TIPOS.find(x=>x[0]===t)||['','📦'])[1];
+const abrir = id => $(id).classList.add('show');
+const fechar = id => $(id).classList.remove('show');
+
+function toast(msg, tipo='ok'){
+  const t = $('toast'); t.textContent = msg; t.className = 'toast show ' + tipo;
+  clearTimeout(t._h); t._h = setTimeout(()=>t.className='toast', 2600);
+}
+function beep(){
+  try{
+    const a = new (window.AudioContext||window.webkitAudioContext)();
+    const o = a.createOscillator(), g = a.createGain();
+    o.frequency.value = 1500; g.gain.value = .12; o.connect(g); g.connect(a.destination);
+    o.start(); o.stop(a.currentTime + .09);
+  }catch(e){}
+  if (navigator.vibrate) navigator.vibrate(70);
+}
+function persistir(){ LS.set('itens', itens); render(); }
+
+/* ========= LISTA ========= */
+function contarDuplicados(){
+  const c = {};
+  itens.forEach(i => { const k = (i.serial||'').toUpperCase(); if(k) c[k]=(c[k]||0)+1; });
+  return c;
+}
+function render(){
+  $('quem').textContent = cfg.tecnico ? `${cfg.tecnico} · ${cfg.localidade||'sem localidade'}` : 'Toque em ⚙️ para configurar';
+  const dup = contarDuplicados();
+  const qtdDup = itens.filter(i => dup[(i.serial||'').toUpperCase()] > 1).length;
+  $('sTotal').textContent = itens.length;
+  $('sTipos').textContent = new Set(itens.map(i=>i.tipo)).size;
+  $('sDup').textContent = qtdDup;
+
+  // filtros com contagem
+  const cont = {}; itens.forEach(i => cont[i.tipo]=(cont[i.tipo]||0)+1);
+  const opcoes = ['Todos', ...TIPOS.map(t=>t[0]).filter(t=>cont[t])];
+  if (qtdDup) opcoes.push('Duplicados');
+  if (!opcoes.includes(filtro)) filtro = 'Todos';
+  $('filtros').innerHTML = opcoes.map(o => {
+    const n = o==='Todos'?itens.length : o==='Duplicados'?qtdDup : cont[o];
+    return `<button class="chip ${o===filtro?'on':''}" onclick="filtro='${o}';render()">${o==='Todos'||o==='Duplicados'?'':icone(o)+' '}${o}<small>${n}</small></button>`;
+  }).join('');
+
+  const q = $('busca').value.trim().toLowerCase();
+  const vis = itens.filter(i =>
+    (filtro==='Todos' || (filtro==='Duplicados' ? dup[(i.serial||'').toUpperCase()]>1 : i.tipo===filtro)) &&
+    (!q || [i.serial,i.patrimonio,i.marca,i.modelo,i.obs,i.tipo].join(' ').toLowerCase().includes(q))
+  );
+  $('tituloLista').textContent = `Itens lidos (${vis.length})`;
+  $('btnEnviar').disabled = !itens.length;
+
+  $('lista').innerHTML = vis.length ? vis.map(i => {
+    const isDup = dup[(i.serial||'').toUpperCase()] > 1;
+    const cls = i.estado==='Defeito'||i.estado==='Descarte' ? 'def' : i.estado==='Em uso' ? 'ok' : '';
+    return `<div class="item">
+      <div class="ico">${icone(i.tipo)}</div>
+      <div class="info" onclick="editar('${i.id}')">
+        <b>${esc([i.marca,i.modelo].filter(Boolean).join(' ') || i.tipo)}</b>
+        <div class="meta">SN ${esc(i.serial||'—')}${i.patrimonio?' · PAT '+esc(i.patrimonio):''}</div>
+        <div class="tags"><span class="tag">${esc(i.tipo)}</span><span class="tag ${cls}">${esc(i.estado)}</span>${isDup?'<span class="tag dup">⚠ duplicado</span>':''}<span class="tag">${esc((i.lidoEm||'').slice(11,16))}</span></div>
+      </div>
+      <div class="acts"><button onclick="editar('${i.id}')" aria-label="Editar">✏️</button><button onclick="excluir('${i.id}')" aria-label="Excluir">🗑️</button></div>
+    </div>`;
+  }).join('') : `<div class="empty"><div class="big">${itens.length?'🔎':'📷'}</div>${itens.length?'Nada encontrado com esse filtro.':'Nenhum item ainda.<br>Toque em <b>Escanear</b> para começar.'}</div>`;
+}
+
+/* ========= FORMULÁRIO ========= */
+function renderTipos(){
+  $('types').innerHTML = TIPOS.map(([t,i]) => `<button class="type ${t===tipoSel?'on':''}" onclick="tipoSel='${t}';renderTipos()"><i>${i}</i>${t}</button>`).join('');
+  $('estados').innerHTML = ESTADOS.map(e => `<button class="${e===estadoSel?'on':''}" onclick="estadoSel='${e}';renderTipos()">${e}</button>`).join('');
+}
+function atualizarSugestoes(){
+  const marcas = [...new Set([...itens.map(i=>i.marca).filter(Boolean), ...MARCAS])];
+  const modelos = [...new Set(itens.map(i=>i.modelo).filter(Boolean))];
+  $('lMarcas').innerHTML = marcas.map(m=>`<option value="${esc(m)}">`).join('');
+  $('lModelos').innerHTML = modelos.map(m=>`<option value="${esc(m)}">`).join('');
+}
+function abrirForm(dados={}){
+  if (!cfg.tecnico) { abrirConfig(); toast('Configure técnico e localidade primeiro','warn'); return; }
+  editId = dados.id || null;
+  $('fTitulo').textContent = editId ? 'Editar ativo' : 'Novo ativo';
+  $('fHint').textContent = editId ? 'Corrija o que for preciso.' : (dados.serial ? 'Código lido! Confira e complete.' : 'Preencha os dados do ativo.');
+  if (dados.tipo) tipoSel = dados.tipo;
+  estadoSel = dados.estado || 'Em uso';
+  // ao ler um novo item, reaproveita marca/modelo do último do mesmo tipo (agiliza lotes iguais)
+  const ultimo = !editId ? itens.find(i=>i.tipo===tipoSel) : null;
+  CAMPOS.forEach(c => $(c).value = dados[c] ?? ((c==='marca'||c==='modelo') && ultimo ? ultimo[c] : ''));
+  atualizarSugestoes(); renderTipos(); abrir('ovForm');
+  if (!dados.serial && !editId) setTimeout(()=>$('serial').focus(), 250);
+}
+function fecharForm(){ fechar('ovForm'); editId = null; }
+
+function salvar(proximo){
+  const d = { tipo: tipoSel, estado: estadoSel };
+  CAMPOS.forEach(c => d[c] = $(c).value.trim());
+  d.serial = d.serial.toUpperCase();
+  if (!d.serial && !d.patrimonio) { toast('Informe o serial ou o patrimônio','warn'); return; }
+  const repetido = d.serial && itens.some(i => i.id!==editId && (i.serial||'').toUpperCase()===d.serial);
+  if (repetido && !confirm(`O serial ${d.serial} já está na lista.\nSalvar mesmo assim?`)) return;
+
+  if (editId) Object.assign(itens.find(i=>i.id===editId), d);
+  else itens.unshift({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,5), lidoEm: agoraBR(), ...d });
+  LS.set('ultimoTipo', tipoSel);
+  persistir(); fecharForm();
+  toast(editId ? 'Alterado ✔' : `Salvo ✔  (${itens.length} na lista)`);
+  if (proximo) setTimeout(abrirScanner, 250);
+}
+function editar(id){ abrirForm(itens.find(i=>i.id===id)); }
+function excluir(id){
+  const i = itens.find(x=>x.id===id);
+  if (confirm(`Excluir ${i.tipo} ${i.serial||i.patrimonio}?`)) { itens = itens.filter(x=>x.id!==id); persistir(); toast('Excluído','warn'); }
+}
+function agoraBR(){
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/* ========= SCANNER ========= */
+function lerCampo(campo){ campoAlvo = campo; fechar('ovForm'); abrirScanner(); }
+
+async function abrirScanner(){
+  if (!cfg.tecnico) { abrirConfig(); toast('Configure técnico e localidade primeiro','warn'); return; }
+  if (typeof Html5Qrcode === 'undefined') { toast('Leitor não carregou. Verifique a internet.','err'); return; }
+  $('scanTitulo').textContent = campoAlvo==='patrimonio' ? 'Leia a etiqueta de patrimônio' : 'Aponte para o código de barras';
+  abrir('ovScan'); lendo = true;
+  const F = Html5QrcodeSupportedFormats;
+  scanner = new Html5Qrcode('reader', {
+    verbose: false,
+    formatsToSupport: [F.CODE_128,F.CODE_39,F.CODE_93,F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.ITF,F.CODABAR,F.QR_CODE,F.DATA_MATRIX],
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+  });
+  try{
+    await scanner.start(
+      { facingMode: 'environment' },
+      { fps: 12, qrbox: (w,h) => ({ width: Math.min(w*0.78, 360), height: 150 }) },
+      aoLer, () => {}
+    );
+    try{
+      const torch = scanner.getRunningTrackCameraCapabilities().torchFeature();
+      $('btnTorch').style.display = torch.isSupported() ? '' : 'none';
+    }catch(e){ $('btnTorch').style.display = 'none'; }
+  }catch(e){
+    fecharScanner();
+    toast('Não foi possível abrir a câmera. Permita o acesso nas configurações.','err');
+  }
+}
+function aoLer(codigo){
+  if (!lendo) return; lendo = false;
+  codigo = codigo.trim();
+  const alvo = campoAlvo; campoAlvo = null;
+  beep(); fecharScanner();
+  if (alvo) {
+    abrir('ovForm'); $(alvo).value = alvo==='serial' ? codigo.toUpperCase() : codigo;
+    toast('Lido: ' + codigo);
+  } else {
+    const ja = itens.find(i => (i.serial||'').toUpperCase()===codigo.toUpperCase());
+    if (ja) toast('⚠ Esse serial já foi lido antes','warn');
+    abrirForm({ serial: codigo.toUpperCase() });
+  }
+}
+async function alternarLanterna(){
+  try{ lanterna = !lanterna; await scanner.getRunningTrackCameraCapabilities().torchFeature().apply(lanterna); }catch(e){}
+}
+function fecharScanner(){
+  fechar('ovScan'); lanterna = false; lendo = false;
+  if (scanner) { const s = scanner; scanner = null; s.stop().catch(()=>{}).finally(()=>{ try{s.clear()}catch(e){} }); }
+  if (campoAlvo && !$('ovForm').classList.contains('show')) { abrir('ovForm'); campoAlvo = null; }
+}
+
+/* ========= CONFIG ========= */
+function abrirConfig(){
+  $('cTecnico').value = cfg.tecnico;
+  $('cLocalidade').innerHTML = '<option value="">Selecione…</option>' +
+    LOCALIDADES.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
+  $('cLocalidade').value = cfg.localidade;
+  abrir('ovConfig');
+}
+function salvarConfig(){
+  const t = $('cTecnico').value.trim(), l = $('cLocalidade').value;
+  if (!t || !l) { toast('Preencha técnico e localidade','warn'); return; }
+  cfg = { tecnico: t, localidade: l, api: API_PADRAO }; LS.set('cfg', cfg);
+  fechar('ovConfig'); render(); toast('Configuração salva');
+}
+async function testarConexao(){
+  const a = API_PADRAO;
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec/.test(a)) { toast('URL do Apps Script não configurada no código','warn'); return; }
+  try{
+    const r = await fetch(a); const j = await r.json();
+    j.ok ? toast(`Conectado à planilha "${j.planilha}" ✔`) : toast('Resposta inesperada','err');
+  }catch(e){ toast('Não conectou. Confira a implantação (acesso: Qualquer pessoa).','err'); }
+}
+
+/* ========= ENVIO ========= */
+function confirmarEnvio(){
+  if (!itens.length) return;
+  if (!cfg.localidade) { abrirConfig(); toast('Selecione a localidade','warn'); return; }
+  const cont = {}; itens.forEach(i => cont[i.tipo]=(cont[i.tipo]||0)+1);
+  const dupN = Object.values(contarDuplicados()).filter(n=>n>1).length;
+  $('envioResumo').textContent = `${itens.length} itens · ${cfg.tecnico} · ${cfg.localidade}` + (dupN ? ` · ⚠ ${dupN} serial(is) duplicado(s)` : '');
+  $('envioTipos').innerHTML = Object.entries(cont).map(([t,n]) => `<div><span>${icone(t)} ${t}</span><b>${n}</b></div>`).join('');
+  abrir('ovEnvio');
+}
+async function enviar(){
+  const btn = $('btnConfirmar'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Enviando…';
+  const lote = (cfg.localidade.normalize('NFD').replace(/[^A-Za-z]/g,'').slice(0,3).toUpperCase()||'INV') + '-' + Date.now().toString(36).toUpperCase();
+  const corpo = { lote, tecnico: cfg.tecnico, localidade: cfg.localidade, itens: itens.map(({id,...r})=>r) };
+  try{
+    const r = await fetch(cfg.api, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(corpo) });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.erro);
+    hist.unshift({ lote, qtd: j.qtd, quando: agoraBR(), local: cfg.localidade }); LS.set('hist', hist.slice(0,50));
+    itens = []; persistir(); fechar('ovEnvio');
+    toast(`✔ ${j.qtd} itens enviados para a aba ${j.aba||cfg.localidade}`);
+  }catch(e){
+    toast('Falha no envio. Seus itens continuam salvos — tente de novo.','err');
+  }finally{
+    btn.disabled = false; btn.innerHTML = '⬆ Confirmar envio';
+  }
+}
+
+/* ========= EXTRAS ========= */
+function abrirHist(){
+  $('histLista').innerHTML = hist.length
+    ? hist.map(h => `<div><span><b>${esc(h.lote)}</b><br><small style="color:var(--mut)">${esc(h.quando)} · ${esc(h.local)}</small></span><b>${h.qtd} itens</b></div>`).join('')
+    : '<p class="hint" style="padding:16px 0">Nenhum envio ainda.</p>';
+  abrir('ovHist');
+}
+function exportarCSV(){
+  if (!itens.length) { toast('Lista vazia','warn'); return; }
+  const cols = ['tipo','patrimonio','serial','marca','modelo','estado','obs','lidoEm'];
+  const linhas = [['Técnico','Localidade',...cols].join(';'),
+    ...itens.map(i => [cfg.tecnico,cfg.localidade,...cols.map(c=>i[c]||'')].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';'))];
+  const blob = new Blob(['﻿'+linhas.join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `inventario_${(cfg.localidade||'local').replace(/\s+/g,'_')}_${Date.now()}.csv`; a.click();
+}
+
+$('busca').addEventListener('input', render);
+render();
+if (!cfg.tecnico) abrirConfig();
+</script>
+</body>
+</html>
