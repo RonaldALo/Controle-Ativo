@@ -21,6 +21,9 @@ body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
 button{font:inherit;cursor:pointer;border:0}
 input,select,textarea{font:inherit;font-size:16px;width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--txt);outline:none;transition:border .15s}
 input:focus,select:focus,textarea:focus{border-color:var(--pri)}
+select{appearance:none;-webkit-appearance:none;padding-right:42px;cursor:pointer;
+  background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center/18px}
+input[type=date]{min-height:50px}
 label{display:block;font-size:12.5px;font-weight:600;color:var(--mut);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.03em}
 
 /* Header */
@@ -153,7 +156,7 @@ body.modo-rel .top-row{max-width:1240px}
 .tabs button{padding:9px 14px;border-radius:9px;background:none;font-weight:600;font-size:14px;color:var(--mut)}
 .tabs button.on{background:#fff;color:var(--pri);box-shadow:var(--sh)}
 .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.tools input{width:240px;padding:10px 12px}
+.tools input{width:290px;padding:10px 12px}
 .tools .btn{padding:11px 16px}
 .tblwrap{overflow:auto;max-height:62vh;border:1px solid var(--line);border-radius:12px}
 .tbl{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -167,6 +170,16 @@ body.modo-rel .top-row{max-width:1240px}
 .lote-sel{display:inline-flex;align-items:center;gap:6px;background:var(--priSoft);color:var(--pri);font-weight:600;font-size:13px;padding:6px 10px;border-radius:999px}
 .lote-sel button{background:none;color:var(--pri);font-size:14px;padding:0 2px}
 .btn.ghost{background:#fff;color:var(--pri);border:1.5px solid var(--line)}
+.head-out{display:none;align-items:center;gap:7px;height:42px;padding:0 14px;border-radius:12px;background:rgba(255,255,255,.18);color:#fff;font-weight:600;font-size:14px}
+.head-out:hover,.icon-btn:hover{background:rgba(255,255,255,.28)}
+body.modo-rel.logado .head-out{display:inline-flex}
+.fgrid .btn,.fgrid input,.fgrid select{height:50px}
+.empty svg{color:var(--line);margin-bottom:10px}
+.empty b{display:block;color:var(--txt);font-size:15px;margin-bottom:4px}
+.pager{display:flex;justify-content:space-between;align-items:center;padding:12px 4px 2px;font-size:13.5px;color:var(--mut)}
+.pager div{display:flex;gap:6px}
+.pager button{width:36px;height:36px;border-radius:10px;background:var(--bg);border:1.5px solid var(--line);display:grid;place-items:center;color:var(--txt)}
+.pager button:disabled{opacity:.4;cursor:default}
 .hist{font-size:13.5px}
 .hist div{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
 .hist div:last-child{border:0}
@@ -183,6 +196,7 @@ body.modo-rel .top-row{max-width:1240px}
       <div class="sub" id="quem">Configure técnico e localidade</div>
     </div>
     <div class="head-btns">
+      <button class="head-out" onclick="sairRel()" title="Sair do painel"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg>Sair</button>
       <button class="icon-btn" id="btnModo" onclick="trocarModo()" aria-label="Trocar modo" title="Relatórios / Coletor">📊</button>
       <button class="icon-btn" id="btnCfg" onclick="abrirConfig()" aria-label="Configurações">⚙️</button>
     </div>
@@ -232,9 +246,9 @@ body.modo-rel .top-row{max-width:1240px}
         <div><label>De</label><input type="date" id="fDe"></div>
         <div><label>Até</label><input type="date" id="fAte"></div>
         <div><label>Localidade</label><select id="fLocal"></select></div>
-        <div><label>Tipo</label><select id="fTipo" onchange="renderRel()"></select></div>
-        <div><label>Técnico</label><select id="fTec" onchange="renderRel()"></select></div>
-        <div><button class="btn big full" id="btnBuscar" onclick="buscarRel()">🔎 Buscar</button></div>
+        <div><label>Tipo</label><select id="fTipo" onchange="relPag=0;renderRel()"></select></div>
+        <div><label>Técnico</label><select id="fTec" onchange="relPag=0;renderRel()"></select></div>
+        <div><button class="btn big full" id="btnBuscar" onclick="buscarRel()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Buscar</button></div>
       </div>
       <div class="quick">
         <button class="chip" onclick="periodo(0)">Hoje</button>
@@ -243,7 +257,6 @@ body.modo-rel .top-row{max-width:1240px}
         <button class="chip" onclick="periodo(30)">Últimos 30 dias</button>
         <button class="chip" onclick="periodo('mes')">Este mês</button>
         <button class="chip" onclick="periodo('tudo')">Tudo</button>
-        <button class="chip" onclick="sairRel()" style="margin-left:auto">Sair 🔒</button>
       </div>
     </div>
 
@@ -254,8 +267,8 @@ body.modo-rel .top-row{max-width:1240px}
         <div class="tabs" id="relTabs"></div>
         <div class="tools">
           <span id="loteSel"></span>
-          <input id="relBusca" placeholder="Buscar serial, modelo, patrimônio…" oninput="renderRel()">
-          <button class="btn ok" onclick="baixarExcel()">⬇ Excel</button>
+          <input id="relBusca" placeholder="Buscar serial, patrimônio, modelo…" oninput="relPag=0;renderRel()">
+          <button class="btn ok" onclick="baixarExcel()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Excel</button>
         </div>
       </div>
       <div class="tblwrap" id="relTabela"></div>
@@ -369,7 +382,7 @@ body.modo-rel .top-row{max-width:1240px}
    API_PADRAO: URL do Apps Script (termina em /exec).
    LOCALIDADES: cada uma vira uma aba na planilha. Para incluir uma cidade, é só adicionar aqui. */
 const API_PADRAO = 'https://script.google.com/macros/s/AKfycbxto7lwSg8FS-ibP8VW0yNX2DnZex1CiwKFhZFd4RHlVeQrZCNS1jGaM0l9NvdmBATL/exec';
-const LOCALIDADES = ['GVO','Juiz de Fora', 'Araraquara ',"São Paulo","Chile"];
+const LOCALIDADES = ['GVO', 'Uberlândia', 'Juiz de Fora', 'Montes Claros'];
 
 /* CATÁLOGO DE MODELOS por tipo — sempre "Marca Modelo" (a 1ª palavra vira a marca).
    O técnico escolhe na lista; "Outro" abre campos para digitar. */
@@ -674,7 +687,9 @@ function exportarCSV(){
 
 $('busca').addEventListener('input', render);
 /* ========= PAINEL DE RELATÓRIOS ========= */
-let relItens = [], relAba = 'itens', relLote = null, relBuscou = false;
+let relItens = [], relAba = 'resumo', relLote = null, relBuscou = false, relPag = 0;
+const POR_PAGINA = 50;
+const IC_SEARCH = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
 const hojeISO = (off=0) => { const d = new Date(); d.setDate(d.getDate()-off); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const isoBR = s => s ? s.split('-').reverse().join('/') : '';
 
@@ -702,9 +717,9 @@ function verSenha(){ const i = $('relSenha'); i.type = i.type==='password' ? 'te
 function sairRel(){
   try{ sessionStorage.removeItem('inv_senha'); }catch(e){}
   relItens = []; relBuscou = false; $('relSenha').value = '';
-  $('relApp').hidden = true; $('relLogin').hidden = false;
+  $('relApp').hidden = true; $('relLogin').hidden = false; document.body.classList.remove('logado');
 }
-function mostrarRelApp(){ $('relLogin').hidden = true; $('relApp').hidden = false; }
+function mostrarRelApp(){ $('relLogin').hidden = true; $('relApp').hidden = false; document.body.classList.add('logado'); }
 function prepararFiltros(){
   if (!$('fLocal').options.length) {
     $('fLocal').innerHTML = '<option value="">Todas</option>' + LOCALIDADES.map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join('');
@@ -737,7 +752,7 @@ async function buscarRel(login){
       throw new Error(j.erro);
     }
     mostrarRelApp();
-    relItens = j.itens; relLote = null; relBuscou = true;
+    relItens = j.itens; relLote = null; relBuscou = true; relPag = 0;
     const tecAtual = $('fTec').value;
     const tecs = [...new Set(relItens.map(i=>i.tecnico).filter(Boolean))].sort();
     $('fTec').innerHTML = '<option value="">Todos</option>' + tecs.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
@@ -747,7 +762,7 @@ async function buscarRel(login){
     if (login) sairRel();
     toast('Não foi possível carregar o relatório','err');
   }finally{
-    btn.disabled = false; btn.innerHTML = '🔎 Buscar';
+    btn.disabled = false; btn.innerHTML = IC_SEARCH + 'Buscar';
     btnE.disabled = false; btnE.innerHTML = 'Entrar';
   }
 }
@@ -782,26 +797,37 @@ function renderRel(){
   const periodoTxt = $('fDe').value||$('fAte').value ? `${isoBR($('fDe').value)||'início'} a ${isoBR($('fAte').value)||'hoje'}` : 'todo o período';
 
   $('relStats').innerHTML = `
-    <div class="stat"><b>${lista.length}</b><span>itens · ${esc(periodoTxt)}</span></div>
+    <div class="stat"><b>${lista.length.toLocaleString('pt-BR')}</b><span>itens · ${esc(periodoTxt)}</span></div>
     <div class="stat"><b>${lotes.length}</b><span>lotes enviados</span></div>
     <div class="stat"><b>${new Set(lista.map(i=>i.localidade)).size}</b><span>localidades</span></div>
     <div class="stat"><b>${new Set(lista.map(i=>i.tecnico)).size}</b><span>técnicos</span></div>
     <div class="stat err"><b>${defeito}</b><span>defeito / descarte</span></div>
     <div class="stat warn"><b>${lista.filter(isDup).length}</b><span>seriais duplicados</span></div>`;
 
-  const abas = [['itens',`Itens (${lista.length})`],['lotes',`Lotes (${lotes.length})`],['tipos','Por tipo']];
-  $('relTabs').innerHTML = abas.map(([k,t]) => `<button class="${k===relAba?'on':''}" onclick="relAba='${k}';renderRel()">${t}</button>`).join('');
-  $('loteSel').innerHTML = relLote ? `<span class="lote-sel">Lote ${esc(relLote)} <button onclick="relLote=null;renderRel()">✕</button></span>` : '';
+  const abas = [['resumo','Resumo'],['lotes',`Lotes (${lotes.length})`],['itens',`Itens (${lista.length.toLocaleString('pt-BR')})`]];
+  $('relTabs').innerHTML = abas.map(([k,t]) => `<button class="${k===relAba?'on':''}" onclick="relAba='${k}';relPag=0;renderRel()">${t}</button>`).join('');
+  $('loteSel').innerHTML = relLote ? `<span class="lote-sel">Lote ${esc(relLote)} <button onclick="relLote=null;relPag=0;renderRel()">✕</button></span>` : '';
+  const temFiltro = $('relBusca').value.trim() || relLote || $('fTipo').value || $('fTec').value;
 
   let html = '';
   if (!relItens.length) html = '<div class="empty"><div class="big">📭</div>Nenhum inventário nesse período.</div>';
-  else if (relAba==='itens') {
+  else if (relAba==='itens' && !temFiltro) {
+    html = `<div class="empty"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><b>${lista.length.toLocaleString('pt-BR')} itens no período</b>Digite um serial, patrimônio ou modelo na busca, escolha um tipo/técnico ou abra um lote para listar.<br>O <b style="display:inline">Excel</b> baixa todos os itens do período.</div>`;
+  } else if (relAba==='itens' && !lista.length) {
+    html = '<div class="empty"><b>Nada encontrado</b>Confira a busca ou os filtros.</div>';
+  } else if (relAba==='itens') {
+    const totalPag = Math.ceil(lista.length / POR_PAGINA);
+    relPag = Math.min(relPag, totalPag - 1);
+    const ini = relPag * POR_PAGINA, pagina = lista.slice(ini, ini + POR_PAGINA);
     html = `<table class="tbl"><thead><tr><th>Recebido</th><th>Localidade</th><th>Técnico</th><th>Tipo</th><th>Marca / Modelo</th><th>Serial</th><th>Patrimônio</th><th>Estado</th><th>Lote</th><th>Obs.</th></tr></thead><tbody>` +
-      lista.map(i => `<tr class="${isDup(i)?'dup':''}"><td>${esc(i.recebido)}</td><td>${esc(i.localidade)}</td><td>${esc(i.tecnico)}</td><td>${icone(i.tipo)} ${esc(i.tipo)}</td><td>${esc([i.marca,i.modelo].filter(Boolean).join(' '))}</td><td class="mono">${esc(i.serial)}${isDup(i)?' ⚠':''}</td><td class="mono">${esc(i.patrimonio)}</td><td>${esc(i.estado)}</td><td class="mono">${esc(i.lote)}</td><td>${esc(i.obs)}</td></tr>`).join('') +
+      pagina.map(i => `<tr class="${isDup(i)?'dup':''}"><td>${esc(i.recebido)}</td><td>${esc(i.localidade)}</td><td>${esc(i.tecnico)}</td><td>${icone(i.tipo)} ${esc(i.tipo)}</td><td>${esc([i.marca,i.modelo].filter(Boolean).join(' '))}</td><td class="mono">${esc(i.serial)}${isDup(i)?' ⚠':''}</td><td class="mono">${esc(i.patrimonio)}</td><td>${esc(i.estado)}</td><td class="mono">${esc(i.lote)}</td><td>${esc(i.obs)}</td></tr>`).join('') +
       '</tbody></table>';
+    if (totalPag > 1) html += `<div class="pager"><span>${ini+1}–${ini+pagina.length} de ${lista.length.toLocaleString('pt-BR')}</span><div>
+      <button ${relPag===0?'disabled':''} onclick="relPag--;renderRel()" aria-label="Anterior"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></button>
+      <button ${relPag>=totalPag-1?'disabled':''} onclick="relPag++;renderRel()" aria-label="Próxima"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div></div>`;
   } else if (relAba==='lotes') {
     html = `<table class="tbl"><thead><tr><th>Recebido</th><th>Lote</th><th>Localidade</th><th>Técnico</th><th>Composição</th><th class="num">Itens</th></tr></thead><tbody>` +
-      lotes.map(l => `<tr class="click" onclick="relLote='${esc(l.lote)}';relAba='itens';renderRel()"><td>${esc(l.recebido)}</td><td class="mono">${esc(l.lote)}</td><td>${esc(l.localidade)}</td><td>${esc(l.tecnico)}</td><td>${Object.entries(l.tipos).map(([t,n])=>`${icone(t)} ${n}`).join(' &nbsp; ')}</td><td class="num"><b>${l.qtd}</b></td></tr>`).join('') +
+      lotes.map(l => `<tr class="click" onclick="relLote='${esc(l.lote)}';relAba='itens';relPag=0;renderRel()"><td>${esc(l.recebido)}</td><td class="mono">${esc(l.lote)}</td><td>${esc(l.localidade)}</td><td>${esc(l.tecnico)}</td><td>${Object.entries(l.tipos).map(([t,n])=>`${icone(t)} ${n}`).join(' &nbsp; ')}</td><td class="num"><b>${l.qtd}</b></td></tr>`).join('') +
       '</tbody></table>';
   } else {
     const { locs, tipos, c } = matrizTipos(lista);
