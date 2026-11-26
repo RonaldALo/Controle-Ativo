@@ -6,7 +6,8 @@
 <meta name="theme-color" content="#4f46e5">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Inventário de Ativos</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- Leitor de códigos: usa o leitor nativo do Android quando existe; no iPhone usa o ZXing (WebAssembly) -->
+<script src="https://fastly.jsdelivr.net/npm/barcode-detector@3.2.5/dist/iife/ponyfill.js" defer></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
 <style>
 :root{
@@ -109,18 +110,18 @@ main{max-width:680px;margin:-52px auto 0;padding:0 14px}
 .scan-ov.show{display:flex}
 .scan-top{display:flex;justify-content:space-between;align-items:center;padding:calc(14px + env(safe-area-inset-top)) 16px 12px;color:#fff}
 .scan-top b{font-size:16px}
-.cam{flex:1;position:relative;overflow:hidden;display:flex;align-items:center}
-#reader{width:100%}
-#reader video{border-radius:0}
-.scan-frame{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);width:78%;max-width:360px;height:150px;border-radius:18px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);pointer-events:none;z-index:2}
-.scan-frame::before,.scan-frame::after{content:"";position:absolute;left:10px;right:10px;height:2px;background:#ef4444;top:50%;box-shadow:0 0 12px #ef4444;animation:laser 1.6s ease-in-out infinite}
-.scan-frame::after{display:none}
-@keyframes laser{0%,100%{transform:translateY(-55px)}50%{transform:translateY(55px)}}
-.scan-corners{position:absolute;inset:0;border:3px solid #fff;border-radius:18px;opacity:.9}
-.scan-bottom{padding:16px 16px calc(20px + env(safe-area-inset-bottom));display:flex;gap:10px;color:#fff}
-.scan-bottom .btn{flex:1}
-.scan-tip{position:absolute;bottom:18px;left:0;right:0;text-align:center;color:#fff;font-size:14px;z-index:3;text-shadow:0 1px 4px #000}
-
+.cam{flex:1;position:relative;overflow:hidden;background:#000}
+.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.scan-box{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:88%;max-width:460px;height:26%;max-height:190px;min-height:120px;border-radius:16px;border:3px solid rgba(255,255,255,.95);box-shadow:0 0 0 9999px rgba(0,0,0,.5);transition:border-color .15s;pointer-events:none}
+.scan-box.hit{border-color:#22c55e}
+.scan-box .laser{position:absolute;left:12px;right:12px;top:50%;height:2px;background:#ef4444;box-shadow:0 0 12px #ef4444;animation:laser 1.6s ease-in-out infinite}
+@keyframes laser{0%,100%{transform:translateY(-40px)}50%{transform:translateY(40px)}}
+.scan-tip{position:absolute;left:0;right:0;bottom:16px;text-align:center;color:#fff;font-size:14px;text-shadow:0 1px 4px #000;padding:0 20px}
+.scan-zoom{display:flex;align-items:center;gap:12px;padding:12px 20px 0;color:#fff;font-weight:700}
+.scan-zoom input{flex:1;padding:0;border:0;background:none;accent-color:#fff;height:28px}
+.scan-bottom{padding:14px 16px calc(18px + env(safe-area-inset-bottom));display:flex;gap:10px}
+.scan-bottom .btn{flex:1;padding:13px 8px;font-size:14px}
+.scan-bottom .btn.on{background:#fde047;color:#111}
 /* Toast */
 .toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top));transform:translate(-50%,-220%);background:#111827;color:#fff;padding:12px 18px;border-radius:14px;font-weight:600;font-size:14.5px;z-index:50;transition:transform .3s;max-width:92vw;box-shadow:var(--sh)}
 .toast.show{transform:translate(-50%,0)}
@@ -287,9 +288,17 @@ body.modo-rel.logado .head-out{display:inline-flex}
 <!-- Scanner -->
 <div class="scan-ov" id="ovScan">
   <div class="scan-top"><b id="scanTitulo">Aponte para o código de barras</b><button class="icon-btn" onclick="fecharScanner()">✕</button></div>
-  <div class="cam"><div id="reader"></div><div class="scan-tip">Mantenha o código dentro da moldura</div></div>
+  <div class="cam" id="cam" onclick="refocar()">
+    <video id="video" playsinline muted autoplay></video>
+    <div class="scan-box" id="scanBox"><span class="laser"></span></div>
+    <div class="scan-tip" id="scanTip">Mantenha o código dentro da moldura · toque na tela para focar</div>
+  </div>
+  <div class="scan-zoom" id="zoomBox" hidden>
+    <span>1×</span><input type="range" id="zoom" oninput="aplicarZoom(this.value)"><span id="zoomMax">4×</span>
+  </div>
   <div class="scan-bottom">
-    <button class="btn sec" id="btnTorch" style="display:none" onclick="alternarLanterna()">🔦 Lanterna</button>
+    <button class="btn sec" id="btnTorch" hidden onclick="alternarLanterna()">🔦 Lanterna</button>
+    <button class="btn sec" id="btnCam" hidden onclick="trocarCamera()">🔄 Câmera</button>
     <button class="btn sec" onclick="fecharScanner();abrirForm()">⌨️ Digitar</button>
   </div>
 </div>
@@ -381,7 +390,7 @@ body.modo-rel.logado .head-out{display:inline-flex}
 /* ========= CONFIGURAÇÃO =========
    API_PADRAO: URL do Apps Script (termina em /exec).
    LOCALIDADES: cada uma vira uma aba na planilha. Para incluir uma cidade, é só adicionar aqui. */
-const API_PADRAO = 'https://script.google.com/macros/s/AKfycbxto7lwSg8FS-ibP8VW0yNX2DnZex1CiwKFhZFd4RHlVeQrZCNS1jGaM0l9NvdmBATL/exec';
+const API_PADRAO = 'https://script.google.com/macros/s/SEU_ID/exec';
 const LOCALIDADES = ['GVO', 'Uberlândia', 'Juiz de Fora', 'Montes Claros'];
 
 /* CATÁLOGO DE MODELOS por tipo — sempre "Marca Modelo" (a 1ª palavra vira a marca).
@@ -415,7 +424,7 @@ let itens = LS.get('itens', []);
 let cfg = LS.get('cfg', {tecnico:'',localidade:'',api:''});
 let hist = LS.get('hist', []);
 let filtro = 'Todos', editId = null, tipoSel = LS.get('ultimoTipo','Desktop'), estadoSel = 'Em uso';
-let scanner = null, campoAlvo = null, lanterna = false, lendo = false;
+let campoAlvo = null;
 
 // URL fixa no código; localidade pode vir no link (?local=GVO)
 const qs = new URLSearchParams(location.search);
@@ -565,38 +574,129 @@ function agoraBR(){
   return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
-/* ========= SCANNER ========= */
+/* ========= SCANNER =========
+   Câmera própria em alta resolução + foco contínuo + zoom, e leitura só da área da moldura.
+   Confirma o código lendo 2 vezes igual (evita leitura errada em código de barras). */
+const FORMATOS = ['code_128','code_39','code_93','ean_13','ean_8','upc_a','upc_e','itf','codabar','qr_code','data_matrix'];
+const SC = { stream:null, track:null, ativo:false, detector:null, canvas:document.createElement('canvas'),
+             ultimo:'', vezes:0, quando:0, ciclo:0, lanterna:false, cameras:[], camIdx:0 };
+
 function lerCampo(campo){ campoAlvo = campo; fechar('ovForm'); abrirScanner(); }
+
+async function obterDetector(){
+  if (SC.detector) return SC.detector;
+  if ('BarcodeDetector' in window) {               // Android/Chrome: leitor nativo (ML Kit)
+    try{
+      const sup = await BarcodeDetector.getSupportedFormats();
+      if (sup.includes('code_128')) return SC.detector = new BarcodeDetector({ formats: FORMATOS.filter(f => sup.includes(f)) });
+    }catch(e){}
+  }
+  if (window.BarcodeDetectionAPI)                   // iPhone e outros: ZXing-C++ em WebAssembly
+    return SC.detector = new BarcodeDetectionAPI.BarcodeDetector({ formats: FORMATOS });
+  throw new Error('leitor indisponível');
+}
 
 async function abrirScanner(){
   if (!cfg.tecnico) { abrirConfig(); toast('Configure técnico e localidade primeiro','warn'); return; }
-  if (typeof Html5Qrcode === 'undefined') { toast('Leitor não carregou. Verifique a internet.','err'); return; }
-  $('scanTitulo').textContent = campoAlvo==='patrimonio' ? 'Leia a etiqueta de patrimônio' : 'Aponte para o código de barras';
-  abrir('ovScan'); lendo = true;
-  const F = Html5QrcodeSupportedFormats;
-  scanner = new Html5Qrcode('reader', {
-    verbose: false,
-    formatsToSupport: [F.CODE_128,F.CODE_39,F.CODE_93,F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.ITF,F.CODABAR,F.QR_CODE,F.DATA_MATRIX],
-    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
-  });
-  try{
-    await scanner.start(
-      { facingMode: 'environment' },
-      { fps: 12, qrbox: (w,h) => ({ width: Math.min(w*0.78, 360), height: 150 }) },
-      aoLer, () => {}
-    );
-    try{
-      const torch = scanner.getRunningTrackCameraCapabilities().torchFeature();
-      $('btnTorch').style.display = torch.isSupported() ? '' : 'none';
-    }catch(e){ $('btnTorch').style.display = 'none'; }
-  }catch(e){
-    fecharScanner();
-    toast('Não foi possível abrir a câmera. Permita o acesso nas configurações.','err');
-  }
+  $('scanTitulo').textContent = (campoAlvo==='patrimonio') ? 'Leia a etiqueta de patrimônio' : 'Aponte para o código de barras';
+  abrir('ovScan');
+  try{ await obterDetector(); }
+  catch(e){ fecharScanner(); toast('Leitor não carregou. Verifique a internet.','err'); return; }
+  try{ await ligarCamera(LS.get('camId', null)); }
+  catch(e){ fecharScanner(); toast('Não foi possível abrir a câmera. Permita o acesso nas configurações.','err'); return; }
+  SC.ativo = true; SC.ultimo = ''; SC.vezes = 0; SC.ciclo = 0;
+  loopLeitura();
 }
+
+async function ligarCamera(deviceId){
+  pararCamera();
+  const video = { width:{ideal:1920}, height:{ideal:1080} };
+  if (deviceId) video.deviceId = { exact: deviceId }; else video.facingMode = { ideal:'environment' };
+  try{ SC.stream = await navigator.mediaDevices.getUserMedia({ audio:false, video }); }
+  catch(e){ if (!deviceId) throw e; LS.set('camId', null); return ligarCamera(null); }
+  SC.track = SC.stream.getVideoTracks()[0];
+  const v = $('video'); v.srcObject = SC.stream; await v.play().catch(()=>{});
+
+  // Lista câmeras traseiras (Android costuma ter várias: principal, grande angular, macro…)
+  try{
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind==='videoinput');
+    const tras = devs.filter(d => !/front|frontal|user|facetime/i.test(d.label));
+    SC.cameras = tras.length ? tras : devs;
+    SC.camIdx = Math.max(0, SC.cameras.findIndex(d => d.deviceId === SC.track.getSettings().deviceId));
+    // Na primeira vez no Android, prefere a câmera principal ("camera2 0")
+    if (!deviceId && !LS.get('camId', null)) {
+      const principal = SC.cameras.find(d => /camera2 0\b|camera 0\b/i.test(d.label));
+      if (principal && principal.deviceId !== SC.track.getSettings().deviceId) return ligarCamera(principal.deviceId);
+    }
+  }catch(e){}
+  $('btnCam').hidden = SC.cameras.length < 2;
+
+  // Foco contínuo, zoom inicial e lanterna (quando o aparelho permite)
+  const caps = SC.track.getCapabilities ? SC.track.getCapabilities() : {};
+  const adv = [];
+  if ((caps.focusMode||[]).includes('continuous')) adv.push({ focusMode:'continuous' });
+  if (caps.zoom && caps.zoom.max > 1) {
+    const max = Math.min(caps.zoom.max, 6), ini = Math.min(Math.max(caps.zoom.min, LS.get('zoom', 1.8)), max);
+    const z = $('zoom'); z.min = caps.zoom.min; z.max = max; z.step = caps.zoom.step || 0.1; z.value = ini;
+    $('zoomMax').textContent = Math.round(max) + '×'; $('zoomBox').hidden = false;
+    adv.push({ zoom: ini });
+  } else $('zoomBox').hidden = true;
+  if (adv.length) await SC.track.applyConstraints({ advanced: adv }).catch(()=>{});
+  $('btnTorch').hidden = !caps.torch; SC.lanterna = false; $('btnTorch').classList.remove('on');
+}
+
+function pararCamera(){
+  if (SC.stream) SC.stream.getTracks().forEach(t => t.stop());
+  SC.stream = null; SC.track = null; $('video').srcObject = null;
+}
+
+// Recorta a área da moldura (em pixels reais do vídeo) e lê só ela — mais rápido e mais preciso
+function recortar(cheio){
+  const v = $('video'), vw = v.videoWidth, vh = v.videoHeight;
+  if (!vw || !vh) return null;
+  let sx = 0, sy = 0, sw = vw, sh = vh;
+  if (!cheio) {
+    const cam = $('cam').getBoundingClientRect(), box = $('scanBox').getBoundingClientRect();
+    const esc = Math.max(cam.width / vw, cam.height / vh);            // object-fit: cover
+    const ox = (cam.width - vw*esc) / 2, oy = (cam.height - vh*esc) / 2;
+    const mx = box.width*0.08, my = box.height*0.35;                   // folga ao redor da moldura
+    sx = Math.max(0, (box.left - cam.left - mx - ox) / esc);
+    sy = Math.max(0, (box.top - cam.top - my - oy) / esc);
+    sw = Math.min(vw - sx, (box.width + 2*mx) / esc);
+    sh = Math.min(vh - sy, (box.height + 2*my) / esc);
+  }
+  const k = Math.min(1, 1600 / sw);                                     // limita tamanho para ficar rápido
+  const c = SC.canvas; c.width = Math.round(sw*k); c.height = Math.round(sh*k);
+  c.getContext('2d', { willReadFrequently:true }).drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return c;
+}
+
+async function loopLeitura(){
+  if (!SC.ativo) return;
+  try{
+    SC.ciclo++;
+    const img = recortar(SC.ciclo % 4 === 0);                           // a cada 4 leituras, olha a tela inteira
+    if (img) {
+      const res = await SC.detector.detect(img);
+      if (res.length) {
+        const r = res.sort((a,b) => (b.rawValue||'').length - (a.rawValue||'').length)[0];
+        const val = (r.rawValue||'').trim(), agora = Date.now();
+        if (val) {
+          if (val === SC.ultimo && agora - SC.quando < 2000) SC.vezes++; else { SC.ultimo = val; SC.vezes = 1; }
+          SC.quando = agora;
+          $('scanBox').classList.add('hit'); clearTimeout(SC._hit); SC._hit = setTimeout(()=>$('scanBox').classList.remove('hit'), 250);
+          const precisa = (r.format==='qr_code' || r.format==='data_matrix' || r.format==='ean_13') ? 1 : 2;
+          if (SC.vezes >= precisa) { aoLer(val); return; }
+        }
+      }
+    }
+  }catch(e){}
+  setTimeout(loopLeitura, 60);
+}
+
 function aoLer(codigo){
-  if (!lendo) return; lendo = false;
-  codigo = codigo.trim();
+  if (!SC.ativo) return;
+  SC.ativo = false;
   const alvo = campoAlvo; campoAlvo = null;
   beep(); fecharScanner();
   if (alvo) {
@@ -608,14 +708,42 @@ function aoLer(codigo){
     abrirForm({ serial: codigo.toUpperCase() });
   }
 }
+
+async function aplicarZoom(z){
+  LS.set('zoom', Number(z));
+  if (SC.track) await SC.track.applyConstraints({ advanced:[{ zoom:Number(z) }] }).catch(()=>{});
+}
+async function refocar(){                                               // toque na tela: força novo foco
+  if (!SC.track) return;
+  const modos = (SC.track.getCapabilities?.().focusMode) || [];
+  if (modos.includes('single-shot')) await SC.track.applyConstraints({ advanced:[{ focusMode:'single-shot' }] }).catch(()=>{});
+  if (modos.includes('continuous')) setTimeout(()=>SC.track && SC.track.applyConstraints({ advanced:[{ focusMode:'continuous' }] }).catch(()=>{}), 900);
+  $('scanTip').textContent = 'Focando…'; setTimeout(()=>$('scanTip').textContent = 'Mantenha o código dentro da moldura · toque na tela para focar', 1200);
+}
 async function alternarLanterna(){
-  try{ lanterna = !lanterna; await scanner.getRunningTrackCameraCapabilities().torchFeature().apply(lanterna); }catch(e){}
+  if (!SC.track) return;
+  SC.lanterna = !SC.lanterna;
+  await SC.track.applyConstraints({ advanced:[{ torch:SC.lanterna }] }).catch(()=>{});
+  $('btnTorch').classList.toggle('on', SC.lanterna);
+}
+async function trocarCamera(){
+  if (SC.cameras.length < 2) return;
+  const prox = SC.cameras[(SC.camIdx + 1) % SC.cameras.length];
+  LS.set('camId', prox.deviceId);
+  try{ await ligarCamera(prox.deviceId); toast('Câmera ' + ((SC.camIdx||0)+1) + ' de ' + SC.cameras.length); }
+  catch(e){ toast('Não foi possível trocar de câmera','err'); }
 }
 function fecharScanner(){
-  fechar('ovScan'); lanterna = false; lendo = false;
-  if (scanner) { const s = scanner; scanner = null; s.stop().catch(()=>{}).finally(()=>{ try{s.clear()}catch(e){} }); }
+  SC.ativo = false; fechar('ovScan'); pararCamera();
   if (campoAlvo && !$('ovForm').classList.contains('show')) { abrir('ovForm'); campoAlvo = null; }
 }
+
+// Pré-carrega o leitor do iPhone para o 1º scan ser rápido
+window.addEventListener('load', () => {
+  if (!('BarcodeDetector' in window) && window.BarcodeDetectionAPI) {
+    try{ BarcodeDetectionAPI.prepareZXingModule({ fireImmediately:true }); }catch(e){}
+  }
+});
 
 /* ========= CONFIG ========= */
 function abrirConfig(){
