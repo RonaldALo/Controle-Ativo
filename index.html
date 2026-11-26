@@ -116,6 +116,11 @@ main{max-width:680px;margin:-52px auto 0;padding:0 14px}
 .scan-box.hit{border-color:#22c55e}
 .scan-box .laser{position:absolute;left:12px;right:12px;top:50%;height:2px;background:#ef4444;box-shadow:0 0 12px #ef4444;animation:laser 1.6s ease-in-out infinite}
 @keyframes laser{0%,100%{transform:translateY(-40px)}50%{transform:translateY(40px)}}
+.scan-cand{position:absolute;left:50%;top:calc(44% + min(13%, 95px) + 18px);transform:translateX(-50%);background:#fff;color:#111;border-radius:14px;padding:10px 16px 12px;min-width:230px;max-width:88%;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.4);cursor:pointer}
+.scan-cand b{display:block;font-family:ui-monospace,Menlo,monospace;font-size:17px;word-break:break-all}
+.scan-cand small{color:#6b7280;font-size:12px}
+.scan-cand .prog{height:4px;background:#e5e7eb;border-radius:9px;margin-top:8px;overflow:hidden}
+.scan-cand .prog i{display:block;height:100%;width:0;background:#16a34a;border-radius:9px}
 .scan-tip{position:absolute;left:0;right:0;bottom:16px;text-align:center;color:#fff;font-size:14px;text-shadow:0 1px 4px #000;padding:0 20px}
 .scan-zoom{display:flex;align-items:center;gap:12px;padding:12px 20px 0;color:#fff;font-weight:700}
 .scan-zoom input{flex:1;padding:0;border:0;background:none;accent-color:#fff;height:28px}
@@ -291,6 +296,7 @@ body.modo-rel.logado .head-out{display:inline-flex}
   <div class="cam" id="cam" onclick="refocar()">
     <video id="video" playsinline muted autoplay></video>
     <div class="scan-box" id="scanBox"><span class="laser"></span></div>
+    <div class="scan-cand" id="scanCand" hidden onclick="event.stopPropagation();usarCandidato()"><b id="candTxt"></b><small>Segure parado ou toque aqui para usar</small><div class="prog"><i id="candBar"></i></div></div>
     <div class="scan-tip" id="scanTip">Mantenha o código dentro da moldura · toque na tela para focar</div>
   </div>
   <div class="scan-zoom" id="zoomBox" hidden>
@@ -390,7 +396,7 @@ body.modo-rel.logado .head-out{display:inline-flex}
 /* ========= CONFIGURAÇÃO =========
    API_PADRAO: URL do Apps Script (termina em /exec).
    LOCALIDADES: cada uma vira uma aba na planilha. Para incluir uma cidade, é só adicionar aqui. */
-const API_PADRAO = 'https://script.google.com/macros/s/SEU_ID/exec';
+const API_PADRAO = 'https://script.google.com/macros/s/AKfycbw89NpjTddE8H-cd27jX1yQL9O2KvLn2eGeIt2XrBHnZZPBMGMePnXgHyXW5Sv1HT2p/exec';
 const LOCALIDADES = ['GVO', 'Uberlândia', 'Juiz de Fora', 'Montes Claros'];
 
 /* CATÁLOGO DE MODELOS por tipo — sempre "Marca Modelo" (a 1ª palavra vira a marca).
@@ -576,10 +582,11 @@ function agoraBR(){
 
 /* ========= SCANNER =========
    Câmera própria em alta resolução + foco contínuo + zoom, e leitura só da área da moldura.
-   Confirma o código lendo 2 vezes igual (evita leitura errada em código de barras). */
+   Só aceita o código que estiver DENTRO da moldura, mais perto do centro, e parado por ~0,8 s (ou ao tocar nele). */
 const FORMATOS = ['code_128','code_39','code_93','ean_13','ean_8','upc_a','upc_e','itf','codabar','qr_code','data_matrix'];
 const SC = { stream:null, track:null, ativo:false, detector:null, canvas:document.createElement('canvas'),
-             ultimo:'', vezes:0, quando:0, ciclo:0, lanterna:false, cameras:[], camIdx:0 };
+             cand:'', candDesde:0, candVisto:0, roi:null, lanterna:false, cameras:[], camIdx:0 };
+const TEMPO_CONFIRMA = 800;   // ms parado no mesmo código para aceitar sozinho
 
 function lerCampo(campo){ campoAlvo = campo; fechar('ovForm'); abrirScanner(); }
 
@@ -604,7 +611,7 @@ async function abrirScanner(){
   catch(e){ fecharScanner(); toast('Leitor não carregou. Verifique a internet.','err'); return; }
   try{ await ligarCamera(LS.get('camId', null)); }
   catch(e){ fecharScanner(); toast('Não foi possível abrir a câmera. Permita o acesso nas configurações.','err'); return; }
-  SC.ativo = true; SC.ultimo = ''; SC.vezes = 0; SC.ciclo = 0;
+  SC.ativo = true; limparCandidato();
   loopLeitura();
 }
 
@@ -651,11 +658,11 @@ function pararCamera(){
 }
 
 // Recorta a área da moldura (em pixels reais do vídeo) e lê só ela — mais rápido e mais preciso
-function recortar(cheio){
+function recortar(){
   const v = $('video'), vw = v.videoWidth, vh = v.videoHeight;
   if (!vw || !vh) return null;
-  let sx = 0, sy = 0, sw = vw, sh = vh;
-  if (!cheio) {
+  let sx, sy, sw, sh, bx, by, bw, bh;
+  {
     const cam = $('cam').getBoundingClientRect(), box = $('scanBox').getBoundingClientRect();
     const esc = Math.max(cam.width / vw, cam.height / vh);            // object-fit: cover
     const ox = (cam.width - vw*esc) / 2, oy = (cam.height - vh*esc) / 2;
@@ -664,34 +671,56 @@ function recortar(cheio){
     sy = Math.max(0, (box.top - cam.top - my - oy) / esc);
     sw = Math.min(vw - sx, (box.width + 2*mx) / esc);
     sh = Math.min(vh - sy, (box.height + 2*my) / esc);
+    bx = (box.left - cam.left - ox) / esc; by = (box.top - cam.top - oy) / esc;   // moldura em pixels do vídeo
+    bw = box.width / esc; bh = box.height / esc;
   }
   const k = Math.min(1, 1600 / sw);                                     // limita tamanho para ficar rápido
   const c = SC.canvas; c.width = Math.round(sw*k); c.height = Math.round(sh*k);
   c.getContext('2d', { willReadFrequently:true }).drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  SC.roi = { x0:(bx-sx)*k, y0:(by-sy)*k, x1:(bx-sx+bw)*k, y1:(by-sy+bh)*k };
   return c;
 }
+
+// Escolhe o código cujo centro está DENTRO da moldura e mais perto do centro dela
+function escolher(res){
+  const r = SC.roi; if (!r) return null;
+  const cx = (r.x0+r.x1)/2, cy = (r.y0+r.y1)/2;
+  let melhor = null, dist = Infinity;
+  res.forEach(b => {
+    const val = (b.rawValue||'').trim(); if (!val) return;
+    const bb = b.boundingBox || {}; const mx = bb.x + bb.width/2, my = bb.y + bb.height/2;
+    if (!(mx >= r.x0 && mx <= r.x1 && my >= r.y0 && my <= r.y1)) return;
+    const d = Math.hypot(mx-cx, my-cy);
+    if (d < dist) { dist = d; melhor = { val, format:b.format }; }
+  });
+  return melhor;
+}
+function limparCandidato(){
+  SC.cand = ''; SC.candDesde = 0; SC.candVisto = 0;
+  $('scanCand').hidden = true; $('scanBox').classList.remove('hit'); $('candBar').style.width = '0';
+}
+function usarCandidato(){ if (SC.cand) aoLer(SC.cand); }
 
 async function loopLeitura(){
   if (!SC.ativo) return;
   try{
-    SC.ciclo++;
-    const img = recortar(SC.ciclo % 4 === 0);                           // a cada 4 leituras, olha a tela inteira
+    const img = recortar();
+    const agora = Date.now();
     if (img) {
-      const res = await SC.detector.detect(img);
-      if (res.length) {
-        const r = res.sort((a,b) => (b.rawValue||'').length - (a.rawValue||'').length)[0];
-        const val = (r.rawValue||'').trim(), agora = Date.now();
-        if (val) {
-          if (val === SC.ultimo && agora - SC.quando < 2000) SC.vezes++; else { SC.ultimo = val; SC.vezes = 1; }
-          SC.quando = agora;
-          $('scanBox').classList.add('hit'); clearTimeout(SC._hit); SC._hit = setTimeout(()=>$('scanBox').classList.remove('hit'), 250);
-          const precisa = (r.format==='qr_code' || r.format==='data_matrix' || r.format==='ean_13') ? 1 : 2;
-          if (SC.vezes >= precisa) { aoLer(val); return; }
-        }
+      const alvo = escolher(await SC.detector.detect(img));
+      if (alvo) {
+        if (alvo.val !== SC.cand) { SC.cand = alvo.val; SC.candDesde = agora; }   // código novo: recomeça a contagem
+        SC.candVisto = agora;
+        $('candTxt').textContent = alvo.val; $('scanCand').hidden = false; $('scanBox').classList.add('hit');
+        const prog = Math.min(1, (agora - SC.candDesde) / TEMPO_CONFIRMA);
+        $('candBar').style.width = (prog*100) + '%';
+        if (prog >= 1) { aoLer(alvo.val); return; }
+      } else if (SC.cand && agora - SC.candVisto > 450) {
+        limparCandidato();                                                        // saiu da moldura: zera
       }
     }
   }catch(e){}
-  setTimeout(loopLeitura, 60);
+  setTimeout(loopLeitura, 50);
 }
 
 function aoLer(codigo){
@@ -734,7 +763,7 @@ async function trocarCamera(){
   catch(e){ toast('Não foi possível trocar de câmera','err'); }
 }
 function fecharScanner(){
-  SC.ativo = false; fechar('ovScan'); pararCamera();
+  SC.ativo = false; fechar('ovScan'); pararCamera(); limparCandidato();
   if (campoAlvo && !$('ovForm').classList.contains('show')) { abrir('ovForm'); campoAlvo = null; }
 }
 
